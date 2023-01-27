@@ -209,3 +209,101 @@ bool TwinPeaksSoundVisualizer::visualize(const float* const fftData, const size_
 	return changed;
 }
 #pragma endregion TwinPeaks
+
+
+
+#pragma region tKe Visualizer
+DECLARE_VISUALIZER(Tke, "tKe",
+public:
+private:
+    float m_peakBass{0.0f};
+	float m_peakMid{0.0f};
+	float m_peakTreb{0.0f};
+);
+
+bool TkeSoundVisualizer::visualize(const float *const fftData, const size_t fftSize, QList<QRgb> &colors)
+{
+	bool changed = false;
+	const unsigned int middleLed = std::floor(colors.size() / 2);
+
+	float *dbData = new float[fftSize];
+
+	// most sensitive Hz range for humans
+	// this assumes 44100Hz sample rate
+	const unsigned int bassHzMin = 20 / (44100 / 2 / (unsigned int)fftSize);
+	const unsigned int bassHzMax = 400 / (44100 / 2 / (unsigned int)fftSize);
+
+	const unsigned int midHzMin = 400 / (44100 / 2 / (unsigned int)fftSize);
+	const unsigned int midHzMax = 2400 / (44100 / 2 / (unsigned int)fftSize);
+
+	const unsigned int trebHzMin = 2400 / (44100 / 2 / (unsigned int)fftSize);
+	const unsigned int trebHzMax = 6000 / (44100 / 2 / (unsigned int)fftSize);
+
+	// calculate magnitudes in each range 
+	float currentBass = 0.0f;
+	float currentMid = 0.0f;
+	float currentTreb = 0.0f;
+	for (size_t i = 0; i < fftSize; ++i)
+	{
+		float mag = sqrt(fftData[i]);
+		if (i > bassHzMin && i < bassHzMax)
+			currentBass += mag;
+		if (i > midHzMin && i < midHzMax)
+			currentMid += mag;
+		if (i > trebHzMin && i < trebHzMax)
+			currentTreb += mag;
+	}
+	// normalise to range size
+	currentBass /= bassHzMax - bassHzMin;
+	currentMid /= midHzMax - midHzMin;
+	currentTreb /= trebHzMax - trebHzMin;
+
+	// maintain peaks
+	float peakBass = m_peakBass;
+	if (peakBass < currentBass)
+		peakBass = currentBass;
+	else
+		peakBass = std::max(0.0f, peakBass * 0.9995f);
+
+	float peakMid = m_peakMid;
+	if (peakMid < currentMid)
+		peakMid = currentMid;
+	else
+		peakMid = std::max(0.0f, peakMid * 0.9995f);
+
+	float peakTreb = m_peakTreb;
+	if (peakTreb < currentTreb)
+		peakTreb = currentTreb;
+	else
+		peakTreb = std::max(0.0f, peakTreb * 0.9995f);
+
+	m_peakBass = peakBass;
+	m_peakMid = peakMid;
+	m_peakTreb = peakTreb;
+
+	// calculate mid-strip colour based on current and peaks
+	QColor ctr;
+	ctr.setRgbF(
+		1.1f * currentBass / std::max(m_peakBass, std::min(m_peakTreb, m_peakMid)),
+		currentMid / std::max(m_peakMid, std::min(m_peakTreb, m_peakBass)),
+		currentTreb / std::max(m_peakTreb, std::min(m_peakBass, m_peakMid))
+	);
+	QRgb outColor = ctr.rgb();
+	
+	changed = changed || (colors[middleLed] != outColor);
+	colors[middleLed] = outColor;
+
+	// flow from center of strip out
+	QColor old = QColor::fromRgb(0);
+	for (unsigned int i = 0; i < middleLed; ++i) {
+		QRgb c = colors[i + 1];
+		
+		changed = changed || (colors[i] != c);
+		colors[i] = c;
+		colors[colors.size() - i - 1] = colors[i];
+	}
+
+	m_frames++;
+	return changed;
+}
+#pragma endregion Tke
