@@ -226,8 +226,6 @@ bool TkeSoundVisualizer::visualize(const float *const fftData, const size_t fftS
 	bool changed = false;
 	const unsigned int middleLed = std::floor(colors.size() / 2);
 
-	float *dbData = new float[fftSize];
-
 	// most sensitive Hz range for humans
 	// this assumes 44100Hz sample rate
 	const unsigned int bassHzMin = 20 / (44100 / 2 / (unsigned int)fftSize);
